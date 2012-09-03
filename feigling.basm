@@ -1,0 +1,100 @@
+RAM: 0
+
+DEVICE: 1 0 0
+DEVICE: 6 3 128
+DEVICE: 2 3 0
+DEVICE: 3 3 0
+DEVICE: 7 4 0
+DEVICE: 5 2 0
+DEVICE: 4 1 128
+DEVICE: 4 1 133
+DEVICE: 4 1 123
+DEVICE: 4 1 138
+DEVICE: 15 2 118
+DEVICE: 5 2 0
+DEVICE: 0 2 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+ 
+;  Feigling - A robot which desperately tries to run away from everything and
+;                 fires a huge shower of plasmashots to the rear 
+;
+; June 2001, by Helge Dennhardt
+;
+
+; We don't need much brainpower for this robot. It has only one CPU (the slowest).
+; It is booted here.
+;
+%CPUboot 0
+
+out Chiller0_SetExtraCooling, 1  	; With all these plasmashots we definitely need the 
+;                                                      	  cooling turned on from the beginning (!)
+out Engine0_SetThrust, 256          	; Move as fast as you can  
+out Scanner0_SetScanWidth, 512	; Look vaguely in all directions
+out Scanner0_SetSensitivity, 2      	; Look at everything except (your own) plasmashots
+
+; This is the Loop of the first phase. We are only turning
+; away from the enemy
+; 
+:Loop
+out Scanner0_Scan, 1                  	; Emit the scanning impulse
+hwait                   
+in ax, Scanner0_GetScanDistance 	; Anything there ?  
+cmp ax, 65535 
+jz Loop
+in ax, Scanner0_GetScanAccuracy	; Where is it ?
+cmp ax, 2                                     
+jz Fokus                                        	; Since the scanner is centered at the rear, the accuracy is 2 when
+;                                                   	; the opponent is behind us - then jump to the second phase
+mov dx, 205                                   	; If the opponent is not (yet) in the rear, turn around...
+mul
+sub ax, 410
+out Steering0_AdjustCurrentDir, ax
+jmp Loop                                      	; .... and scan again.
+
+; In the second phase, everything is behind us, so
+; we can narrow the ScanWidth
+;
+:Fokus
+out Scanner0_SetScanWidth, 256
+
+; This is the main loop of the second phase. We start firing what
+; we can
+;
+:Loop2
+out Scanner0_Scan, 2                    	; Emit scanning impulse
+in ax, Armor0_GetHeat                  	; Only fire, if we are not overheatet.
+cmp ax, 100                                   	; (this happens for sure, when the fuel for the cooling device is empty)
+ja NoShoot
+out Plasmagun0_Shoot, 1              	; Fire !
+out Plasmagun1_Shoot, 1
+out Plasmagun2_Shoot, 1
+out Plasmagun3_Shoot, 1
+:NoShoot
+in ax, Scanner0_GetScanAccuracy	; Make adjustments of the heading for better firing
+mov dx, 102
+mul
+sub ax, 204                                   	; Since the scanner is  centered in the read, an accuracy
+out Steering0_AdjustCurrentDir, ax	; of 2 means, the enemy is in the middle of our plasmashots 2*102-104 = 0
+jmp Loop2
+
+
+

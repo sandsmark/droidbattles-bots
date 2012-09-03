@@ -1,0 +1,101 @@
+RAM: 0
+
+DEVICE: 1 4 0
+DEVICE: 2 4 0
+DEVICE: 3 4 0
+DEVICE: 6 4 0
+DEVICE: 20 4 0
+DEVICE: 19 4 0
+DEVICE: 9 4 3
+DEVICE: 9 4 4
+DEVICE: 9 4 5
+DEVICE: 7 4 0
+DEVICE: 5 4 0
+DEVICE: 5 4 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+; stuff bot does before actuall fightig, finding out if 
+; opponent is cloaked for examole, exellent vs. 
+; revenger ;0)
+out 14,2                ; set scaninfo to dir
+out 4,100              ; set speed to 100%
+:reset
+out 15,5                ; set scan sensity to level 5
+mov bx,512            ; set scan width to all around
+out 13,bx               ; set bx to full-range
+out 12,1                ; emit scan impulse
+nop
+nop
+nop
+nop
+nop
+nop
+in ax,12                ; get dis. from last scan
+cmp ax,65000       ; enemy within scan range?
+jb main                ; i yes leave everything how it is
+out 15,2               ; if not, he is probably cloaked
+
+:main
+out 10,10              ; to turn, turn, turn 
+out 13,bx              ; set scanwidth to bx
+out 12,1               ; emit scanimpulse
+nop
+nop
+in ax,12               ; get dis. from last scan
+cmp ax,65000       ; enemy within scan range?
+ja reset                ; reset
+in dx,13               ; get offset of last scan
+cmp dx,2              ; was object in middle?
+jz action               ; object was in middle, fire
+ja turn_right          ; object is to the right
+jb turn_left            ; object is to the left
+
+:turn_left
+out 25,1005         ; turn turrents left
+out 29,1005         ; turn turrents left
+out 33,1005         ; turn turrents left
+jmp smaller          ; make radar smaller?              
+
+:turn_right
+out 25,15            ; turn turrent right
+out 29,15            ; turn turrent right
+out 33,15            ; turn turrent right
+jmp smaller         ; make radar smaller?
+
+:action
+cmp ax,8000        ; object within beam range?
+jb beam               ; if yes then jump to beam
+:actionTWO
+in ax,12               ;get distance from last scan
+out 16,ax             ;set distance for as-rocket
+out 17,1               ;fire rocket
+
+:smaller
+cmp bx,32           ;compare current size with min size
+jbe main             ; if min size reched start new main loop
+sub bx,20           ; if not reached yet, make radar smaller
+jmp main            ; start new run of main loop
+
+:beam
+out 22,ax           ; set length of beam
+out 20,1            ; fire beam
+jmp actionTWO ; star new run of main loop

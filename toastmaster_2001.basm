@@ -1,0 +1,128 @@
+RAM: 0
+
+DEVICE: 1 3 0
+DEVICE: 1 0 0
+DEVICE: 2 3 0
+DEVICE: 3 3 0
+DEVICE: 6 4 0
+DEVICE: 7 4 0
+DEVICE: 5 4 0
+DEVICE: 5 4 0
+DEVICE: 19 4 0
+DEVICE: 5 4 0
+DEVICE: 7 0 0
+DEVICE: 15 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+
+%org 10
+%CPUboot 0
+:init
+out Engine0_SetThrust, 130
+out Beam0_SetBeamLength, 8000
+out Scanner0_SetScanWidth, 30
+out Scanner0_SetSensitivity, 2
+mov bx, 30
+hwait
+:main
+out Steering0_AdjustCurrentDir, bx
+out Scanner0_Scan, 1
+hwait
+in ax, Scanner0_GetScanDistance
+cmp ax, 8000
+ja check_found
+out Beam0_SetBeamLength, ax
+;in dx, Armor0_GetHeat
+;cmp dx, 450
+;ja beam_off
+mov cx, 1
+mov @0, cx
+
+
+
+
+:pinpoint
+in ax, Scanner0_GetScanAccuracy
+cmp ax, 2
+ja turn_right
+jb turn_left
+out Beam0_SetBeamDir, 0
+;mov bx, 0
+jmp main
+
+:check_found
+cmp ax, 60000
+ja nothing_found
+jmp beam_off
+
+:turn_right
+cmp ax, 3
+ja turn_hard_right
+out Beam0_SetBeamDir, 15
+mov bx, 10
+jmp main
+
+:turn_hard_right
+out Beam0_SetBeamDir, 30
+mov bx, 20
+jmp main
+
+:turn_left
+cmp ax, 1
+jb turn_hard_left
+out Beam0_SetBeamDir, 1009
+mov bx, 1014
+jmp main
+
+:turn_hard_left
+out Beam0_SetBeamDir, 994
+mov, bx, 1004
+jmp main
+
+:nothing_found
+mov cx, 0
+mov @0, cx
+cmp bx, 20
+jb turn_hard_right
+cmp bx, 1004
+ja turn_hard_left
+jmp main
+
+:beam_off
+mov cx, 0
+mov @0, cx
+jmp pinpoint
+
+
+%CPUboot 1
+:idle
+mov ax, @0
+cmp ax, 0
+jz idle
+out Chiller0_SetExtraCooling, 1
+:active
+out Beam0_FireBeam, 1
+mov ax, @0
+cmp ax, 0
+jnz active
+out Chiller0_SetExtraCooling, 0
+jmp idle

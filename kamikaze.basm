@@ -1,0 +1,154 @@
+RAM: 0
+
+DEVICE: 1 0 0
+DEVICE: 3 4 0
+DEVICE: 6 4 0
+DEVICE: 2 2 0
+DEVICE: 4 4 0
+DEVICE: 4 4 0
+DEVICE: 5 4 0
+DEVICE: 5 4 0
+DEVICE: 5 4 0
+DEVICE: 7 4 0
+DEVICE: 13 1 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+; Kamikaze - Dasher based on spray2.bot
+
+$turn                6
+$scan              8
+$scan_width     9
+$scan_result     9
+$engine           12
+$fire1               16
+$fire2               20
+$left_lrg          960
+$left_med       992
+$left_sml        1018
+$right_lrg      64
+$right_med   32
+$right_sml     6
+$scan_distance  60000
+$scan_tooclose  5000
+$scan_lrg           514
+$scan_med         129
+$scan_sml          33
+$scan_ahead     2
+$go_slow           100
+$lock_scale        4
+$lock_left           1016
+$do_it                  0
+
+
+:first
+out scan_width, scan_lrg
+out scan, do_it
+out engine, go_slow
+nop
+
+in ax, scan
+cmp ax, scan_distance
+jae first
+
+in ax, scan_result
+cmp ax, scan_ahead
+jz second  ; In front
+jae firstright
+out turn, left_lrg
+jmp first
+
+:firstright
+out turn, right_lrg
+jmp first
+
+:second
+out scan_width, scan_med
+out scan, do_it
+out engine, go_slow
+nop
+
+in ax, scan
+cmp ax, scan_distance
+jae first
+
+in ax, scan_result
+cmp ax, scan_ahead
+jz attack  ; In front
+jae secondright
+out turn, left_med
+jmp second
+
+:secondright
+out turn, right_med
+jmp second
+
+:attack
+out scan_width, scan_sml
+out scan, do_it
+nop
+nop
+in ax, scan
+cmp ax, scan_distance
+jae second
+in ax, scan_result
+cmp ax, scan_ahead
+jz attackfine ; Front
+jae attackright
+out turn, left_sml
+jmp attack
+
+:attackright
+out turn, right_sml
+jmp attack
+
+:attackloop
+; Now, the bot is directly in front of the bot.
+; ping again, fire, adjust if target moved, loop
+out scan, do_it
+out fire1, do_it
+nop
+
+; check for target presence
+in ax, scan
+cmp ax, scan_distance
+jae second               ; damn
+out fire2, do_it
+cmp ax, scan_tooclose
+jbe attack_stop
+sub ax, scan_tooclose
+mov dx, 75
+div
+out fire1, do_it
+out engine, ax
+jmp attackfine
+:attack_stop
+out engine, 0
+
+:attackfine
+in ax, scan_result
+mov dx, lock_scale
+out fire2, do_it
+mul
+add ax, lock_left
+out turn, ax
+jmp attackloop

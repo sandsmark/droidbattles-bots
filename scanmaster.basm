@@ -1,0 +1,247 @@
+RAM: 0
+
+DEVICE: 1 4 0
+DEVICE: 6 3 0
+DEVICE: 6 3 64
+DEVICE: 6 2 128
+DEVICE: 6 3 192
+DEVICE: 2 4 0
+DEVICE: 3 4 0
+DEVICE: 18 4 0
+DEVICE: 9 4 7
+DEVICE: 5 4 0
+DEVICE: 7 4 0
+DEVICE: 7 4 0
+DEVICE: 0 4 0
+DEVICE: 0 4 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+ 
+;  Scanmaster - A robot which tries to evade shots, missiles and other robots.
+;
+; June 2001, by Helge Dennhardt
+;
+
+; We only have one CPU, but it's very fast. It is bootet here.
+;
+%CPUboot 0
+out Engine0_SetThrust, 256                     	; This never gets changed, we're always moving.
+out Missile0_SetBootPos, MissileBoot       	; Set the Boot Position of the Missile-CPUs (see below)
+
+; If the Robot gets <1000 points distance to the border, it is turned towards
+; the middle. For this we calculete in before, where the middle is and where
+; the right and bottom turning point.
+;
+in ax, CPU0_GetXSize      
+in bx, CPU0_GetYSize     
+mov cx, ax
+mov dx, bx
+shr ax, 1
+shr bx, 1
+mov @CenterX, ax         	; Coordinates of the middle of the arena
+mov @CenterY, bx
+sub cx, 1000
+sub dx, 1000
+mov @MaxX, cx             	;  X-coordinate of the right turning point
+mov @MaxY, dx             	;  Y-coordinate of the bottom turning point  
+
+; We have four scanners which all are responsible for one quarter of the view.
+; This way we have in each scan cycle a resolution of 51 botdegrades without
+; turning or focussing anything.
+;
+out Scanner0_SetScanWidth, 128   	; This gives a resolution of 128*2/5=51 botgrades 
+out Scanner1_SetScanWidth, 128
+out Scanner2_SetScanWidth, 128
+out Scanner3_SetScanWidth, 128
+out Scanner0_SetSensitivity, 1       		;  Set maximum sensitivity - We want to evade everything
+out Scanner1_SetSensitivity, 1
+out Scanner2_SetSensitivity, 1
+out Scanner3_SetSensitivity, 1
+
+; Here starts the main loop.  It goes all the way down to the missile code
+;
+:Loop
+out Scanner0_Scan, 1                      	; We start with emitting a scan impuls on all four
+out Scanner1_Scan, 1                      	; scanners. No hwait is needed here.
+out Scanner2_Scan, 1
+out Scanner3_Scan, 1
+in ax, Scanner0_GetScanDistance     	; Get all Distance values from all scanners
+in bx, Scanner1_GetScanDistance
+in cx, Scanner2_GetScanDistance
+in dx, Scanner3_GetScanDistance
+
+out Missile0_FireMissile, 1           	; Fire the missile. The direction is set elsewhere. We fire it here,
+;                                                     	  so that it can get a away a bit until the next scan cycle starts.
+
+cmp ax, bx                                     	; Decide which of the four scanners has found the nearest object 
+ja a1
+cmp ax, cx
+ja a2
+cmp ax, dx
+ja Read3
+jmp Read0
+:a1
+cmp bx, cx
+ja a2
+cmp bx, dx
+ja Read3
+jmp Read1
+:a2
+cmp cx, dx
+ja Read3
+jmp Read2
+
+;  Read scanner 0  (to the front)
+;
+:Read0                                          
+mov bx, ax                                     	; Save distance value
+in ax, Scanner0_GetScanAccuracy	; Where is the enemy ?
+mov dx, 51                                    	; Resolution of 51 botgrades
+mul
+add ax, 922                                   	; An Accuracy of 2 (center of scan) means, the object
+jmp ReadingDone                        	; is to the front, so 2*51+922 = 1024  
+
+;  Read scanner 1  (to the right)
+;
+:Read1                                          	; Distance value is already in bx and thus saved.
+in ax, Scanner1_GetScanAccuracy	; Where is the enemy ?
+mov dx, 51                                    	; Resolution of 51 botgrades
+mul
+add ax, 154                                  	; An Accuracy of 2 (center of scan) means, the object
+jmp ReadingDone                       	; is to the right, so 2*51+154 = 256  
+
+;  Read scanner 2  (to the rear) 
+;
+:Read2
+mov bx, cx                                   	; Save distance value
+in ax, Scanner2_GetScanAccuracy	;Where is the enemy ?
+mov dx, 51                                   	; Resolution of 51 botgrades                      
+mul
+add ax, 410                                  	; An accuracy of 2 (center of scan) means, the object
+jmp ReadingDone                        	; is to the back, so 2*51+410 = 512 
+
+;  Read scanner 3  (to the left) 
+;
+:Read3
+mov bx, dx                                    	; Save distance value
+in ax, Scanner3_GetScanAccuracy	;Where is the enemy ?
+mov dx, 51                                   	; Resolution of 51 botgrades
+mul
+add ax, 666                                  	; An accuracy of 2 (center of scan) means, the object
+:ReadingDone                               	; is to the left, so 2*51+666 = 768
+
+out Turret0_SetOffset, ax             	; Aim the missile at the enemy. It gets fired right after
+;                                                  	  emitting the scan impulses.
+
+
+in cx, Steering0_GetXPos            	; If you are <1000 points distance to a border, don't worry about
+cmp cx, 1000                              	; enemy and steer directly to the center.
+jb SteerToCenter
+cmp cx, @MaxX
+ja SteerToCenter 
+in cx, Steering0_GetYPos
+cmp cx, 1000
+jb SteerToCenter
+cmp cx, @MaxY
+ja SteerToCenter
+
+cmp bx, 65535                            	; If you are not in the vicinity of the border but don't see anything,
+jz Loop                                       	; then just move straight on.
+
+; This is the important section of the steering algorithm: Always try to
+; head perpendicular to the aproaching enemy.
+;
+and ax, 1023                               	; Make the direction of the enemy a value modulo 1024.
+cmp ax, 512                                 	; A value <512 means steering left to it, >512 right to it.
+ja a3                                             
+cmp bx, 3000                                	; If the enemy gets to close, also try to increase the distance a bit 
+jb a4
+sub ax, 256                                   	; Head perpendicular left to the enemy
+out Steering0_AdjustCurrentDir, ax
+jmp Loop
+:a4
+sub ax, 384                                   	; Head more than perpendicular to the enemy
+out Steering0_AdjustCurrentDir, ax
+jmp Loop
+:a3
+cmp bx, 3000                               	; If the enemy gets to close, also try to increase the distance a bit
+jb a5
+add ax, 256                                  	; Head perpendicular to the enemy
+out Steering0_AdjustCurrentDir, ax
+jmp Loop
+:a5
+add ax, 384                                  	; Head more than perpendicular to the enemy
+out Steering0_AdjustCurrentDir, ax
+jmp Loop
+
+; In case we are close to the border, head to the center of the arena, not worrying about enemies.
+;
+:SteerToCenter
+mov bx, @CenterX                       	; Absoulte coordinates of the center of the arena
+mov dx, @CenterY
+in ax, Steering0_GetXPos             	; Ccaluate its relative coordinates
+sub bx, ax
+in ax, Steering0_GetYPos
+sub dx, ax
+atanfunc                                       	; From this calulate the direction
+out Steering0_SetDir, ax                	; and head to it.
+jmp Loop
+
+; Absolute coordinates of the center of the arena
+;
+#CenterX
+dw 0
+#CenterY
+dw 0
+
+; Turning points at the right and bottom border
+;
+#MaxX
+dw 0
+#MaxY
+dw 0
+
+; Some constants of the missile hardware
+$Missile0_Scanner0_GetScanAccuracy 9
+$Missile0_Scanner0_Scan 8
+$Missile0_Scanner0_SetScanWidth 9
+$Missile0_Scanner0_SetSensitivity 11
+$Missile0_Steering0_AdjustCurrentDir 6
+
+; Boot position of the missile
+;
+:MissileBoot
+out Missile0_Scanner0_SetScanWidth, 64  		; Scanning area of 128 botgrades
+out Missile0_Scanner0_SetSensitivity, 4     		; React on missiles, bots and chaff
+
+; The main Missile Loop
+;
+:MissileLoop
+out Missile0_Scanner0_Scan , 1                    	; Emit scan impulse
+hwait
+in ax, Missile0_Scanner0_GetScanAccuracy   	; Where is the enemy?
+mov dx, 250                                                 		; Steer heaviliy
+mul
+sub ax, 500                                                  		; An accuracy of 2 (center of scan) means, the 
+out Missile0_Steering0_AdjustCurrentDir, ax     	; object is to the front, so 2*250-500 = 0
+jmp MissileLoop
+
+
+

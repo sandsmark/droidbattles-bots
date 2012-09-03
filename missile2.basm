@@ -1,0 +1,287 @@
+RAM: 0
+
+DEVICE: 1 2 0
+DEVICE: 6 3 0
+DEVICE: 3 3 0
+DEVICE: 2 0 0
+DEVICE: 18 4 12
+DEVICE: 18 4 244
+DEVICE: 18 4 23
+DEVICE: 18 4 233
+DEVICE: 18 4 31
+DEVICE: 18 4 225
+DEVICE: 16 1 0
+DEVICE: 7 2 40
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+
+; Missile  2 	A more sophisticated version of the missile-robot. This time
+;               	the missiles go off in a more controlled way. And Since I saw that
+;               	there may indeed be time for a second shot, I added a cloaker and
+;               	an engine for slight backward moving.
+;
+; June 2001, by Helge Dennhardt
+; 
+
+
+; We only have one CPU. It is bootet here.
+;
+%CPUboot 0
+
+; The strategy is to make a wide scan (360 degree) first and as fast as possible
+; to determine the ID of the opponent. Missiles then lock only on this object.
+; 
+out Scanner0_SetScanWidth, 512		; Make a wide scan (360 degree)
+out Scanner0_SelectReturn, 1             	; We want the ID of the opponent 
+out Scanner0_SetSensitivity, 1            	; Maximum sensitivity, in case he is hidden 
+;                                                        	  by a cloaking device
+
+:LockLoop
+out Scanner0_Scan, 1                         	; Emit scanning impulse
+hwait
+in ax, Scanner0_GetScanDistance        	; Found something ? 
+cmp ax, 65535
+jz LockLoop
+in ax, Scanner0_GetScanInfo               	; Get the ID and store it.
+mov @TargetID, ax
+
+out Cloak0_EnableCloak, 1                  	; Now we have time to turn on the cloaker, 
+out Engine0_SetReverseThrust, 256	; the engine, 
+out Missile0_SetBootPos, Missile0Boot    	; and to initialize the missiles.
+out Missile1_SetBootPos, Missile1Boot    
+out Missile2_SetBootPos, Missile2Boot
+out Missile3_SetBootPos, Missile3Boot
+out Missile4_SetBootPos, Missile4Boot
+out Missile5_SetBootPos, Missile5Boot
+
+; Since our missile launchers are fixed to the hull, we have
+; to turn the whole machine around to face our opponent.
+;
+:ResetLoop
+mov cx, 2                                          	; This is for braking (see below)
+mov si, ScanTable                              	; The ScanTable is for focussing on our opponent. 
+;                                                         	  Start with lowest scan resolution
+:FocusLoop
+mov ax, @si
+out Scanner0_SetScanWidth, ax           	; Set the ScanWidth according to the ScanTable.
+;
+:AimLoop
+out Scanner0_Scan, 1                         	; Emit the scanner impulse
+hwait
+in ax, Scanner0_GetScanDistance        	; Do we see anything ?
+cmp ax, 65535
+jz Defocus				;If not then defocus a bit
+cmp ax, 15000				;Is it too near?  
+ja StopEngine
+out Engine0_SetReverseThrust, 256          	; yes - Start engine for moving away
+jmp GoOn
+:StopEngine   				; no - Stop engine for saving fuel
+out Engine0_SetReverseThrust, 0
+:GoOn
+in ax, Scanner0_GetScanAccuracy        	; Is it in front of us? - Then focus the scanner
+cmp ax, 2
+jz Focus
+sub ax, 2                                             	; Else turn the machine around according to ScanTable
+mov dx, @si +2                                    	; to have the opponent in front of us.
+imul
+out Steering0_AdjustCurrentDir, ax
+jmp AimLoop
+
+:Focus                                                
+cmp si, LastEntry                                  	; Maximum focus reached ?
+jz Brake                                                 
+add si, 4                                             	; Focus by going to the next entry in the ScanTable
+jmp FocusLoop
+
+:Defocus
+cmp si, ScanTable                                	; Minimum focus reached ?
+jz AimLoop
+sub si, 4                                              	; Defocus by going back one entry in the ScanTable
+jmp FocusLoop
+
+:Brake
+loop FocusLoop                                   	; Stay at least 2 cycles in focus before firing.
+;                                                         	; This assures that the turning really stopped.
+
+in ax, Missile4_GetLoadTime		; Missiles Ready ?
+cmp ax, 0
+jnz FocusLoop
+
+; Firing the missiles. There are three salves for the
+; missiles to move in a formation in which they do not
+; disturb each other (and to look cool).
+;
+in ax, Scanner0_GetScanDistance     	; Initialize distance measurement for the missiles   
+mov @TargetDistance, ax
+in ax, Steering0_GetDir           		; Give the missiles their preferred direction
+mov @MissileDir, ax
+;
+out Missile4_FireMissile, 1      		; Salve one
+out Missile5_FireMissile, 1
+mov cx, 8
+:FireLoop1
+hwait
+loop FireLoop1
+out Missile2_FireMissile, 1      		; Salve two
+out Missile3_FireMissile, 1
+mov cx, 2
+:FireLoop2
+hwait
+loop FireLoop2
+out Missile0_FireMissile, 1      		; Salve three
+out Missile1_FireMissile, 1      
+
+jmp ResetLoop          
+
+; The ScanTable is for focussing the scanner on the opponent.
+; The first value in each line is the ScanWidth and the second the 
+; corresponding Resolution to it.
+;
+#ScanTable
+dw 512, 204
+dw 256, 102
+dw 128, 51
+#LastEntry
+dw 64, 26
+
+; Here the ID of the opponent's main ship is stored.
+; With this, even though the missiles are fired at anything
+; in the vicinity, they are only locking on the opponent's main ship.
+;
+#TargetID
+dw 0
+
+; The direction in which the enemy is/was seen,
+; all missiles are moving this way.
+;
+#MissileDir
+dw 0
+
+; The distance of the missiles to the target. If many missiles see it, the minimum
+; value is stored. This is used to decide, when to narrow the missile formation
+; to attack.
+;
+#TargetDistance
+dw 0
+
+; Some constants of the missile hardware
+$MissileX_Scanner0_GetScanDistance 8
+$MissileX_Scanner0_GetScanAccuracy 9
+$MissileX_Scanner0_GetScanInfo 11
+$MissileX_Scanner0_Scan 8
+$MissileX_Scanner0_SetScanWidth 9
+$MissileX_Scanner0_SelectReturn 10
+$MissileX_Scanner0_SetSensitivity 11
+$MissileX_Steering0_SetDir 5
+$MissileX_Steering0_AdjustCurrentDir 6
+
+:Missile0Boot		; Each missile has its own boot point to give them an
+mov dx, 0		; individual attacking arc. When the missile formation
+jmp MissileBoot		; closes on the enemy, the outermost missiles have
+;			  to turn much more then the inner ones.
+:Missile1Boot
+mov dx, 0
+jmp MissileBoot
+
+:Missile2Boot
+mov dx, 992
+jmp MissileBoot
+
+:Missile3Boot
+mov dx, 32
+jmp MissileBoot
+
+:Missile4Boot
+mov dx, 768
+jmp MissileBoot
+
+:Missile5Boot
+mov dx, 256
+
+; Common boot point for the missiles
+;
+:MissileBoot			
+out MissileX_Scanner0_SetScanWidth, 64		; Set a small scanning width so that they
+;						; don't see each other.
+out MissileX_Scanner0_SelectReturn, 1		; We want the object ID to identify it
+out MissileX_Scanner0_SetSensitivity, 1		; Maximum Sensitivity
+mov ax, @MissileDir				; Start with the preferred direction
+out MissileX_Steering0_SetDir, ax
+mov cx, 10					; This is for not hitting yourself (see below)
+
+; This is the first phase. Moving in formation until
+; the enemy is near enough. The missiles tell each
+; other the measured distance and calculate the
+; minimum.
+;
+:MissileLoop
+out MissileX_Scanner0_Scan, 1			; Emit scanning impulse
+hwait
+in bx, MissileX_Scanner0_GetScanDistance		; Do we see something ? 
+cmp bx, 65535
+jz NotCloser					; No - so we don't have a better distance value
+in ax, MissileX_Scanner0_GetScanInfo                     	; Is it the enemy's main ship ?
+cmp ax, @TargetID
+jnz NotCloser					; No - so we don't have a better distance value
+mov ax, @TargetDistance				; Is it closer then any other distance measuerment ?
+cmp ax, bx
+jbe NotCloser					; No - so we don't have a better distance value
+mov ax, bx
+mov @TargetDistance, ax				; Yes! - Tell the other missiles
+:NotCloser
+cmp @TargetDistance, 13000			; Close enough to enter phase two ?
+jae MissileLoop
+
+; This is the second phase. The missiles are close
+; to the enemy and are now turned around until
+; they see him themselves.
+;
+:AttackLoop
+out MissileX_Scanner0_Scan, 1			; Emit scanning impulse
+hwait
+in ax, MissileX_Scanner0_GetScanDistance		; Do we see something ?
+cmp ax, 65535
+jz DontSeeHim
+in ax, MissileX_Scanner0_GetScanInfo		; Is it the enemy's main ship ?
+cmp ax, @TargetID
+jnz DontSeeHim
+mov dx, 0					; Then don't turn anymore, but steer yourself
+in ax, MissileX_Scanner0_GetScanAccuracy		; Where is it ?
+cmp ax, 2
+jb Left
+ja Right
+out MissileX_Steering0_AdjustCurrentDir, 0             	; Go straight
+jmp AttackLoop
+:Left
+out MissileX_Steering0_AdjustCurrentDir, 768 	; Turn left
+jmp AttackLoop
+:Right
+out MissileX_Steering0_AdjustCurrentDir, 256	; Turn right
+jmp AttackLoop
+
+:DontSeeHim
+out MissileX_Steering0_AdjustCurrentDir, dx		; We don't see him, so continue to turn
+loop AttackLoop					; for a while
+mov dx, 0					; If we don't see him for 10 cycles, stop
+jmp AttackLoop					; turning not to hit yourself
+
+

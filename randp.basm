@@ -1,0 +1,310 @@
+RAM: 0
+
+DEVICE: 1 0 0
+DEVICE: 9 1 2
+DEVICE: 6 3 0
+DEVICE: 9 4 4
+DEVICE: 20 4 0
+DEVICE: 9 4 6
+DEVICE: 4 2 0
+DEVICE: 5 4 0
+DEVICE: 5 4 0
+DEVICE: 13 4 0
+DEVICE: 13 4 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+;BEGIN BOT.ASM INSTRUCTIONS
+;randp.asm - immobile brawler
+;by joe skerik. copy & distribute freely
+;
+;picky scanner platform
+;rocket and plasma gun
+;CPU
+;TURRET(2)
+;SCANNER
+;TURRET(4)
+;AS-ROCKET
+;TURRET(6)
+;PLASMAGUN
+;ARMOR
+;ARMOR
+;REPAIR
+;REPAIR
+;
+:scan
+out 9,512
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae scan
+in ax,9
+cmp ax,2
+jz firston
+ja firstup
+jb firstdown
+jmp scan
+
+:firston
+out 9,256
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae scan
+cmp ax,128
+jb fire
+in ax,9
+cmp ax,2
+jz secondon
+ja secondup
+jb seconddown
+jmp scan
+
+:firstup
+out 5,128
+out 13,128
+out 21,128
+hwait
+out 9,256
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae scan
+cmp ax,128
+jb fire
+in ax,9
+cmp ax,2
+jz secondon
+ja secondup
+jb seconddown
+jmp scan
+
+:firstdown
+out 5,896
+out 13,896
+out 21,896
+hwait
+out 9,256
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae scan
+cmp ax,128
+jb fire
+in ax,9
+cmp ax,2
+jz secondon
+ja secondup
+jb seconddown
+jmp scan
+
+:secondon
+out 9,128
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae firston
+cmp ax,256
+jb fire
+in ax,9
+cmp ax,2
+jz thirdon
+ja thirdup
+jb thirddown
+jmp firston
+
+:secondup
+out 5,64
+out 13,64
+out 21,64
+hwait
+out 9,128
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae firston
+cmp ax,256
+jb fire
+in ax,9
+cmp ax,2
+jz thirdon
+ja thirdup
+jb thirddown
+jmp firston
+
+:seconddown
+out 5,960
+out 13,960
+out 21,960
+hwait
+out 9,128
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae firston
+cmp ax,256
+jb fire
+in ax,9
+cmp ax,2
+jz thirdon
+ja thirdup
+jb thirddown
+jmp firston
+
+:thirdon
+out 9,64
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae secondon
+cmp ax,512
+jb fire
+in ax,9
+cmp ax,2
+jz fourthon
+ja fourthup
+jb fourthdown
+jmp secondon
+
+:thirdup
+out 5,32
+out 13,32
+out 21,32
+hwait
+out 9,64
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae secondon
+cmp ax,512
+jb fire
+in ax,9
+cmp ax,2
+jz fourthon
+ja fourthup
+jb fourthdown
+jmp secondon
+
+:thirddown
+out 5,992
+out 13,992
+out 21,992
+hwait
+out 9,64
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae secondon
+cmp ax,512
+jb fire
+in ax,9
+cmp ax,2
+jz fourthon
+ja fourthup
+jb fourthdown
+jmp secondon
+
+:fourthon
+out 9,32
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jb lock
+jae thirdon
+
+:fourthup
+out 5,16
+out 13,16
+out 21,16
+hwait
+out 9,32
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jb lock
+out 5,1016
+out 13,1016
+out 21,1016
+jae thirdon
+
+:fourthdown
+out 5,1008
+out 13,1008
+out 21,1008
+hwait
+out 9,32
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jb lock
+out 5,8
+out 13,8
+out 21,8
+jae thirdon
+
+:lock
+in ax,4
+out 12,ax
+out 9,16
+out 8,0
+hwait
+in ax,8
+cmp ax,60000
+jae fourthon
+in ax,9
+cmp ax,2
+jz fire
+ja aim_up
+jb aim_down
+jmp fourthon
+
+:aim_up
+out 5,8
+out 13,8
+out 21,8
+jmp fire
+
+:aim_down
+out 5,1016
+out 13,1016
+out 21,1016
+jmp fire
+
+:fire
+in ax,8
+out 16,ax ;set range
+out 17,0  ;FIRE!!
+out 24,0
+jmp lock

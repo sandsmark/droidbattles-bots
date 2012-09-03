@@ -1,0 +1,127 @@
+RAM: 0
+
+DEVICE: 1 3 0
+DEVICE: 6 4 0
+DEVICE: 3 4 0
+DEVICE: 2 0 0
+DEVICE: 7 4 0
+DEVICE: 16 2 0
+DEVICE: 4 0 0
+DEVICE: 4 0 0
+DEVICE: 15 2 0
+DEVICE: 5 4 0
+DEVICE: 7 4 0
+DEVICE: 4 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+;   revenge.basm
+;   by Terje Dahlstrom
+
+;   Uses a cloak device to appear
+;   like a rocket, and a cooler to prevent
+;   heat problems.
+;   Since there still is heat problems, the bot only
+;   fires when target is close.
+
+;   The scanner is set wider than usual
+;   when target is close, so the target doesn't
+;   get away.
+
+%CPUboot 0
+:init
+out Scanner0_SetScanWidth, 30      ;set scanwidth
+out Scanner0_SetSensitivity, 2         ;consider everything but
+;                                                   plasmashots to be a
+;                                                   potential target.
+out Engine0_SetThrust, 70               ;set speed
+mov bx, 12                                    ;turningangle in bx
+mov cx, 0                                      ;keep gun nbr. in cx
+
+hwait                                            ;this is probably the
+hwait                                            ;cheeziest fix in battlebots history.
+hwait                                            ;It's a delay before entering stealth mode
+;                                                   just to confuse crossbow.bot
+
+out Cloak0_EnableCloak, 1             ;enter stealth mode
+:main
+out Steering0_AdjustCurrentDir, bx  ;turn bot
+out Scanner0_Scan, 1                   ;emit scanpulse
+hwait
+in ax, Scanner0_GetScanDistance  ;get distance
+cmp ax, 60000
+ja chiller_off                                 ;if no target
+;                                                  turn off chiller and
+;                                                  continue scanning
+out Chiller0_SetExtraCooling,1        ;when fireing
+;                                                  use active cooling.
+cmp ax, 8000
+ja narrow                                     ;Get wider scanwidth
+out Scanner0_SetScanWidth, 80     ;when target is close
+jmp fire
+:narrow
+out Scanner0_SetScanWidth, 30     ;don't fire when target
+jmp pinpoint                                  ;is far away
+:fire
+in dx, Armor0_GetHeat                   ;check temperature
+cmp dx, 450
+ja pinpoint
+inc cx                                          ;rotate gun nbr
+cmp cx, 1                                     ;and fire one plasmagun
+jz fire_one
+cmp cx, 2
+jz fire_two
+cmp cx, 3
+jz fire_three
+
+:pinpoint
+in ax, Scanner0_GetScanAccuracy
+
+cmp ax, 2
+ja turn_right
+jb turn_left
+jmp main
+
+:turn_right
+mov bx, 12
+jmp main
+
+:turn_left
+mov bx, 1012
+jmp main
+
+:chiller_off
+out Chiller0_SetExtraCooling, 0 ;turn off active cooling.
+out Scanner0_SetScanWidth, 30
+jmp main
+
+:fire_one
+out Plasmagun0_Shoot, 1
+jmp pinpoint
+
+:fire_two
+out Plasmagun1_Shoot, 1
+jmp pinpoint
+
+:fire_three
+out Plasmagun2_Shoot,1
+mov cx, 0
+jmp pinpoint

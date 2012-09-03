@@ -1,0 +1,87 @@
+RAM: 0
+
+DEVICE: 1 3 0
+DEVICE: 2 3 0
+DEVICE: 3 4 0
+DEVICE: 6 4 0
+DEVICE: 4 2 0
+DEVICE: 4 1 0
+DEVICE: 7 4 0
+DEVICE: 7 4 0
+DEVICE: 15 2 0
+DEVICE: 5 4 0
+DEVICE: 16 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+DEVICE: 0 0 0
+
+;set the scanner 
+out 40,1      		   ; activate claoker
+out 32,1                            ; activate chiller
+out 13,512                         ;to allaround-scanning
+out 15,2                            ;to scanlevel 2
+out 4,100                          ;100% speed
+mov bx,512
+mov cx,0
+
+:mainloop
+out 12,1                            ;scanimpulse
+
+in ax,13                           ; were is the devil?
+cmp ax,2                          ; see what offset is
+jz shoot                           ; if ax == 2
+ja move_left                     ; if ax == 3 || ax == 4
+jb move_right                    ; if ax == 0 || ax == 1
+
+:move_left
+out 10,20
+mov cx,0
+jmp smaller
+
+:move_right
+out 10,-20
+mov cx,0
+jmp smaller
+
+:shoot
+out 16,1                         ;shoot
+out 20,1                         ;shoot 2
+jmp smaller
+
+:smaller
+cmp bx,37
+jbe end
+sub bx,25                       ;decrease scan radius
+jmp end
+
+:end
+out 13,bx
+
+add cx,1
+cmp cx,10
+jae reset
+
+jmp mainloop
+
+:reset
+mov bx,512
+mov cx,0
+jmp mainloop
